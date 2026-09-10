@@ -1,0 +1,433 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Generatore di adempimenti mensili</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+:root{--paper:#EDF0F3;--card:#fff;--ink:#16283B;--muted:#5B6B7C;--rule:#CBD3DC;--risk:#F4C430;--alert:#B3261E;--blue:#2B5C9E}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.5 "Atkinson Hyperlegible",system-ui,sans-serif;font-variant-numeric:tabular-nums}
+main{max-width:1080px;margin:0 auto;padding:28px 20px 60px}
+h1{font-size:1.6rem;margin:0 0 4px}
+.sub{color:var(--muted);margin:0 0 18px}
+.sub a{color:var(--blue)}
+.drop{display:flex;gap:14px;align-items:center;flex-wrap:wrap;background:var(--card);border:1px solid var(--rule);border-radius:10px;padding:16px 18px}
+.drop.over{border-color:var(--blue);box-shadow:0 0 0 3px rgba(43,92,158,.18)}
+.btn{font:inherit;border:1px solid var(--ink);background:var(--ink);color:#fff;border-radius:7px;padding:8px 14px;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--ink)}
+.btn:focus-visible,.cell:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+#status{color:var(--muted)} #status.err{color:var(--alert)}
+.hidden{display:none!important}
+.folder{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:10px;font-size:.92rem;color:var(--muted)}
+.folder b{color:var(--ink)}
+.folder .btn{padding:6px 12px;font-size:.9rem}
+#saveState.ok{color:#1E6B3A}#saveState.err{color:var(--alert)}
+.hero{margin:30px 0 8px;display:flex;align-items:baseline;gap:16px;flex-wrap:wrap}
+.hero .n{font-size:4.2rem;font-weight:700;line-height:1;background:var(--risk);padding:4px 16px;border-radius:10px}
+.hero .t{font-size:1.35rem}
+.hero .t b{display:block;font-size:1.7rem}
+.check{margin:6px 0 18px;color:var(--muted)} .check.warn{color:var(--alert)}
+.layout{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:26px;align-items:start}
+@media (max-width:860px){.layout{grid-template-columns:1fr}.hero .n{font-size:3.2rem}}
+@media (max-width:520px){.cal{gap:3px}.cell{min-height:62px;padding:3px 4px}.cell .p{font-size:.75rem}.cell .l{font-size:.62rem}.cell .x{margin-left:0}}
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.dow{font-size:.8rem;color:var(--muted);padding:0 4px}
+.cell{position:relative;min-height:74px;text-align:left;font:inherit;color:inherit;background:var(--card);border:1px solid var(--rule);border-radius:6px;padding:5px 6px;cursor:pointer;display:flex;flex-direction:column;gap:1px;min-width:0;overflow:hidden}
+.cell .l{hyphens:auto}.cell .x{white-space:nowrap}
+.cell .d{font-weight:700}
+.cell .p{font-size:.85rem}
+.cell .l{font-size:.72rem;color:var(--muted);line-height:1.2}
+.cell.we{background:repeating-linear-gradient(135deg,transparent 0 6px,rgba(22,40,59,.06) 6px 7px);cursor:default}
+.cell.risk{background:var(--risk);border-color:#C99A00}
+.cell.risk .l{color:#4A3B00}
+.cell.manual::after{content:"";position:absolute;inset:3px;border:2px solid var(--ink);border-radius:4px;pointer-events:none}
+.cell.anom{border-color:var(--alert);border-width:2px}
+.cell .x{display:inline-block;margin-left:4px;font-size:.72rem;font-weight:700;color:#fff;background:var(--blue);border-radius:4px;padding:0 4px;line-height:1.4}
+.cell .a{position:absolute;top:3px;right:6px;color:var(--alert);font-weight:700}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:.82rem;color:var(--muted);margin:10px 0 0}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-1px;margin-right:5px;border:1px solid var(--rule)}
+.flags{margin:16px 0 0;padding:12px 14px;border-left:3px solid var(--alert);background:#fff;border-radius:0 8px 8px 0;font-size:.92rem}
+.flags p{margin:0 0 6px}.flags p:last-child{margin:0}
+.msg{background:var(--card);border:1px solid var(--rule);border-radius:10px;padding:16px;margin-bottom:18px}
+.msg h2{font-size:1.1rem;margin:0}
+.msg .due{color:var(--muted);font-size:.9rem;margin:2px 0 10px}
+.msg .due.late{color:var(--alert);font-weight:700}
+.msg label.sm{display:block;font-size:.82rem;color:var(--muted);margin-top:8px}
+.msg input[type=text]{width:100%;font:inherit;padding:6px 8px;border:1px solid var(--rule);border-radius:6px}
+textarea{width:100%;min-height:170px;font:inherit;font-size:.95rem;line-height:1.45;padding:10px;border:1px solid var(--rule);border-radius:6px;resize:vertical}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center}
+.opt{font-size:.88rem;color:var(--muted);display:flex;gap:6px;align-items:center}
+details{margin-top:28px;background:var(--card);border:1px solid var(--rule);border-radius:10px;padding:12px 16px}
+summary{cursor:pointer;font-weight:700}
+.settings{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px 18px;margin:14px 0}
+.settings label{font-size:.85rem;color:var(--muted);display:flex;flex-direction:column;gap:3px}
+.settings input,.settings select{font:inherit;color:var(--ink);padding:6px 8px;border:1px solid var(--rule);border-radius:6px}
+table{width:100%;border-collapse:collapse;font-size:.9rem}
+th,td{text-align:left;padding:5px 6px;border-bottom:1px solid var(--rule);vertical-align:middle}
+th{color:var(--muted);font-weight:400}
+td input{width:100%;min-width:180px;font:inherit;padding:4px 6px;border:1px solid var(--rule);border-radius:5px}
+.ok{color:#1E6B3A}.bad{color:var(--alert)}
+.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:8px 14px;border-radius:7px;font-size:.9rem;opacity:0;transition:opacity .2s}
+.toast.on{opacity:1}
+@media (prefers-reduced-motion:reduce){.toast{transition:none}}
+</style>
+</head>
+<body>
+<main>
+<h1>Generatore di adempimenti mensili</h1>
+<p class="sub">Carica il cartellino scaricato da <a href="https://presenze.uniba.it/#!/cartellino" target="_blank" rel="noopener">presenze.uniba.it</a>: ottieni le giornate di rischio per Lucaioli e la richiesta dei minuti oltre le 9 ore per Domenico. Il file viene letto solo nel browser; documenti e cartellino vengono salvati nella tua cartella di lavoro.</p>
+
+<div class="drop" id="drop">
+  <button class="btn" id="pick">Scegli il PDF</button>
+  <span id="status">oppure trascinalo qui (o incollalo con Ctrl+V)</span>
+  <input type="file" id="file" accept="application/pdf" hidden>
+</div>
+
+<div class="folder" id="folderBar">
+  <span id="folderTxt">Cartella di salvataggio non ancora scelta.</span>
+  <button class="btn ghost" id="folderBtn">Scegli la cartella Lavoro</button>
+  <span id="saveState"></span>
+</div>
+
+<section id="out" class="hidden">
+  <div class="hero"><span class="n" id="nRisk">0</span><span class="t"><b id="monthLbl"></b>giornate di rischio</span></div>
+  <p class="check" id="check"></p>
+
+  <div class="layout">
+    <div>
+      <div class="cal" id="cal"></div>
+      <div class="legend">
+        <span><i style="background:var(--risk);border-color:#C99A00"></i>giornata di rischio</span>
+        <span><i style="background:var(--blue);border-color:var(--blue)"></i>minuti oltre soglia</span>
+        <span><i style="border:2px solid var(--alert)"></i>anomalia</span>
+        <span><i style="box-shadow:inset 0 0 0 2px var(--ink)"></i>modificato a mano</span>
+      </div>
+      <p class="legend">Tocca un giorno feriale per includerlo o escluderlo dal conteggio.</p>
+      <div class="flags hidden" id="flags"></div>
+    </div>
+
+    <div>
+      <div class="msg">
+        <h2>Giornate di rischio a Enrico Lucaioli</h2>
+        <p class="due" id="dueRisk"></p>
+        <label class="sm" for="subjRisk">Oggetto</label>
+        <input type="text" id="subjRisk">
+        <label class="sm" for="msgRisk">Testo</label>
+        <textarea id="msgRisk"></textarea>
+        <div class="row">
+          <button class="btn" data-copy="msgRisk">Copia testo</button>
+          <button class="btn ghost" id="gmailRisk">Apri in Gmail</button>
+          <button class="btn ghost" id="mailRisk">Apri nel programma di posta</button>
+        </div>
+        <div class="row"><label class="opt"><input type="checkbox" id="listDays" checked> Elenca i giorni nel messaggio</label></div>
+      </div>
+
+      <div class="msg">
+        <h2>Minuti oltre le 9 ore a Domenico</h2>
+        <p class="due" id="dueExc"></p>
+        <textarea id="msgExc"></textarea>
+        <div class="row">
+          <button class="btn" data-copy="msgExc">Copia testo</button>
+          <button class="btn ghost" id="mailExc">Apri nel programma di posta</button>
+        </div>
+        <div class="row"><label class="opt"><input type="checkbox" id="detail"> Aggiungi il dettaglio dei minuti</label></div>
+      </div>
+    </div>
+  </div>
+
+  <details>
+    <summary>Impostazioni e timbrature</summary>
+    <div class="settings">
+      <label>Mese<select id="month"></select></label>
+      <label>Anno<input type="number" id="year" min="2020" max="2100"></label>
+      <label>Presenza minima per il rischio<input type="text" id="minPres" value="0:00"></label>
+      <label>Soglia ore eccedenti<input type="text" id="soglia" value="9:00"></label>
+      <label>Scadenza rischio (giorno del mese successivo)<input type="number" id="dueDayRisk" value="18" min="1" max="31"></label>
+      <label>Scadenza ore eccedenti (giorno)<input type="number" id="dueDayExc" value="7" min="1" max="31"></label>
+      <label>Destinatario rischio<input type="text" id="toRisk" value="enrico.lucaioli@uniba.it"></label>
+      <label>Nome coordinatore<input type="text" id="coord" value="Domenico"></label>
+      <label>Firma<input type="text" id="firma"></label>
+    </div>
+    <p class="legend">Le timbrature sono modificabili: scrivi gli orari separati da spazi (es. 08:30 13:00 14:00 17:30) e tutto si ricalcola.</p>
+    <table>
+      <thead><tr><th>Giorno</th><th>Timbrature</th><th>Presenza</th><th>TotTimb</th><th>Causale</th></tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </details>
+</section>
+</main>
+<div class="toast" id="toast"></div>
+<script>
+// ===== PARSER (condiviso tra test Node e pagina HTML) =====
+const MESI=["GENNAIO","FEBBRAIO","MARZO","APRILE","MAGGIO","GIUGNO","LUGLIO","AGOSTO","SETTEMBRE","OTTOBRE","NOVEMBRE","DICEMBRE"];
+const HEADS=["Giorno","Orario","Anomalie","Ent 1","Usc 1","Ent 2","Usc 2","Ent 3","Usc 3","Ent 4","Usc 4","Ent 5","Usc 5","Causale 1","Causale 2","TotTimb","TotC","Dovuto","Car","EccTot"];
+const T=/^\d{1,2}:\d{2}$/;
+const toMin=s=>{const m=String(s).match(/^(-?)(\d{1,3}):(\d{2})$/);return m?(m[1]?-1:1)*(+m[2]*60+ +m[3]):null};
+function parseCartellino(raw){
+  const items=raw.map(i=>({s:String(i.s).replace(/\s+/g," ").trim(),x:i.x,y:i.y})).filter(i=>i.s);
+  const e1=items.find(i=>i.s==="Ent 1"), u5=items.find(i=>i.s==="Usc 5");
+  if(!e1||!u5) throw new Error("intestazioni Ent/Usc non trovate");
+  const rot=Math.abs(e1.x-u5.x)<Math.abs(e1.y-u5.y);
+  let P=items.map(i=>({s:i.s,r:rot?i.x:-i.y,c:rot?i.y:i.x}));
+  const pe1=P[items.indexOf(e1)], pu5=P[items.indexOf(u5)];
+  if(pu5.c<pe1.c) P.forEach(p=>p.c=-p.c);           // colonne in ordine crescente
+  const r0=pe1.r;
+  const heads=HEADS.map(h=>{const it=P.find(p=>p.s===h&&Math.abs(p.r-r0)<2.5);return it?{h,c:it.c}:null}).filter(Boolean);
+  const H=Object.fromEntries(heads.map(h=>[h.h,h.c]));
+  const sh=heads.filter(h=>/^(Ent|Usc) \d$/.test(h.h)).sort((a,b)=>a.c-b.c);
+  const pitch=sh.slice(1).map((h,i)=>h.c-sh[i].c).sort((a,b)=>a-b)[Math.floor((sh.length-1)/2)];
+  const bandStart=H["Ent 1"]-pitch*0.4, bandEnd=H["Usc 5"]+pitch*0.8;
+  const causEnd=(H["TotTimb"]!=null?H["TotTimb"]:1e9)-3;
+  const causSplit=(H["Causale 1"]!=null&&H["Causale 2"]!=null)?bandEnd+(H["Causale 2"]-H["Causale 1"]):1e9;
+  const others=heads.filter(h=>!/^(Ent|Usc) \d$|^Causale/.test(h.h));
+  const nearest=(list,c)=>list.reduce((b,h)=>Math.abs(h.c-c)<Math.abs(b.c-c)?h:b).h;
+  const nearestHead=c=>{
+    if(c>=bandStart&&c<bandEnd) return nearest(sh,c);
+    if(c>=bandEnd&&c<causEnd) return c<causSplit?"Causale 1":"Causale 2";
+    return nearest(others,c);
+  };
+  const body=P.filter(p=>p.r>r0+1.5);
+  // righe giorno
+  const rows=[];
+  body.forEach(p=>{const m=p.s.match(/^(\d{1,2})(?:\s+([A-Za-z]{3}))?$/);
+    if(m&&nearestHead(p.c)==="Giorno"&&+m[1]>=1&&+m[1]<=31&&!rows.some(r=>r.day===+m[1]))
+      rows.push({day:+m[1],r:p.r,wd:m[2]||"",cells:{}});});
+  if(rows.length<28) throw new Error("righe giornaliere non riconosciute ("+rows.length+")");
+  rows.sort((a,b)=>a.r-b.r);
+  const gaps=rows.slice(1).map((r,i)=>r.r-rows[i].r).sort((a,b)=>a-b);
+  const tol=gaps[Math.floor(gaps.length/2)]*0.45;
+  body.forEach(p=>{let best=null,bd=1e9;rows.forEach(r=>{const d=Math.abs(r.r-p.r);if(d<bd){bd=d;best=r}});
+    if(bd>tol)return; const h=nearestHead(p.c);
+    if(h==="Giorno"){ if(/^[A-Za-z]{3}$/.test(p.s)) best.wd=p.s; return;}
+    (best.cells[h]=best.cells[h]||[]).push(p);});
+  const days=rows.sort((a,b)=>a.day-b.day).map(r=>{
+    const col=h=>(r.cells[h]||[]).sort((a,b)=>a.c-b.c).map(p=>p.s).join(" ").trim();
+    const stamps=[];
+    ["Ent 1","Usc 1","Ent 2","Usc 2","Ent 3","Usc 3","Ent 4","Usc 4","Ent 5","Usc 5"].forEach(h=>{const v=col(h);if(T.test(v))stamps.push(v)});
+    const causali=["Causale 1","Causale 2"].map(h=>{const t=col(h);if(!t)return null;
+      const m=t.match(/^(\d{1,4})\s+(.*?)\s*(\d{1,2}:\d{2})?$/);
+      return m?{code:m[1],desc:m[2].trim(),dur:m[3]||""}:{code:"",desc:t,dur:""}}).filter(Boolean);
+    const orario=col("Orario");
+    return {day:r.day,wd:r.wd.toLowerCase(),orario,weekend:/^(sab|dom)$/i.test(r.wd)||/^99[12]$/.test(orario),
+      anomaly:!!col("Anomalie"),stamps,causali,totTimb:col("TotTimb")};
+  });
+  // intestazione
+  const lines={};P.forEach(p=>{const k=Math.round(p.r);(lines[k]=lines[k]||[]).push(p)});
+  const text=Object.keys(lines).sort((a,b)=>a-b).map(k=>lines[k].sort((a,b)=>a.c-b.c).map(p=>p.s).join(" ")).join("\n");
+  const hm=text.match(/([A-ZÀ-Ù' ]+?),\s*([A-Z]+)\s+(\d{4}),\s*Cartellino/);
+  const mat=(text.match(/\[Matricola\]\s*(\d+)/)||[])[1]||"";
+  const gl=P.find(p=>p.s==="Giorni lavorati");
+  let giorniLavorati=null;
+  if(gl){const v=P.filter(p=>Math.abs(p.r-gl.r)<1.5&&p.c>gl.c&&/^\d+([.,]\d+)?$/.test(p.s)).sort((a,b)=>a.c-b.c)[0];if(v)giorniLavorati=parseFloat(v.s.replace(",","."));}
+  const an=P.find(p=>p.s==="Anomalie:");
+  const anomalie=an?P.filter(p=>Math.abs(p.r-an.r)<1.5&&p.c>an.c).sort((a,b)=>a.c-b.c).map(p=>p.s).join(" "):"";
+  const calc=(text.match(/Ultimo calcolo effettuato il giorno ([\d\/]+ [\d:]+)/)||[])[1]||"";
+  return {name:hm?hm[1].trim():"",month:hm?MESI.indexOf(hm[2]):-1,year:hm?+hm[3]:null,matricola:mat,giorniLavorati,anomalie,calc,days};
+}
+pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+const $=id=>document.getElementById(id);
+const MESI_IT=["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
+const fmt=m=>Math.floor(m/60)+":"+String(m%60).padStart(2,"0");
+let S={data:null,days:[],override:{}};
+
+MESI_IT.forEach((m,i)=>{const o=document.createElement("option");o.value=i;o.textContent=m;$("month").appendChild(o)});
+
+function presence(d){let p=0;for(let i=0;i+1<d.stamps.length;i+=2){const a=toMin(d.stamps[i]),b=toMin(d.stamps[i+1]);if(a!=null&&b!=null&&b>a)p+=b-a}return p}
+function label(d){
+  const c=d.causali[0]; if(!c) return "";
+  const t=c.desc;
+  if(/servizio esterno/i.test(t)) return "Serv. esterno"+(c.dur?" "+c.dur.replace(/^0/,""):"");
+  if(/congedo ord|ferie/i.test(t)) return "Ferie";
+  if(/recupero/i.test(t)) return "Recupero"+(c.dur?" "+c.dur.replace(/^0/,""):"");
+  if(/festiv/i.test(t)) return "Festività";
+  return t.length>22?t.slice(0,21)+"…":t;
+}
+function analyze(){
+  const minP=toMin($("minPres").value.trim())||0, thr=toMin($("soglia").value.trim());
+  const T=thr==null?540:thr;
+  S.days.forEach(d=>{
+    d.pres=presence(d); d.odd=d.stamps.length%2===1;
+    d.extOnly=!d.stamps.length&&d.causali.some(c=>/servizio esterno/i.test(c.desc));
+    d.auto=!d.weekend&&d.stamps.length>0&&(d.odd||d.pres>=minP)||(d.weekend&&d.stamps.length>0);
+    d.risk=(S.override[d.day]!==undefined)?S.override[d.day]:d.auto;
+    d.excess=(!d.odd&&d.pres>T)?d.pres-T:0;
+  });
+}
+function joinIt(a){return a.length<2?a.join(""):a.slice(0,-1).join(", ")+" e "+a[a.length-1]}
+function nextMonthDate(day){const m=+$("month").value,y=+$("year").value;const nm=(m+1)%12,ny=m===11?y+1:y;return new Date(ny,nm,Math.min(day,new Date(ny,nm+1,0).getDate()))}
+function dueText(el,day){const d=nextMonthDate(day);const today=new Date();today.setHours(0,0,0,0);
+  const s="Entro il "+d.getDate()+" "+MESI_IT[d.getMonth()].toLowerCase()+" "+d.getFullYear();
+  const diff=Math.round((d-today)/864e5);
+  el.textContent=s+(diff<0?" (scaduta)":diff===0?" (oggi)":" (tra "+diff+" giorn"+(diff===1?"o":"i")+")");
+  el.classList.toggle("late",diff<=0);}
+
+function render(){
+  analyze();
+  const m=+$("month").value,y=+$("year").value, M=MESI_IT[m];
+  const risk=S.days.filter(d=>d.risk);
+  $("nRisk").textContent=risk.length; $("monthLbl").textContent=M+" "+y;
+  // verifica con il cartellino
+  const autoN=S.days.filter(d=>d.auto).length, gl=S.data.giorniLavorati;
+  const ch=$("check");
+  if(gl==null){ch.textContent="Il campo «Giorni lavorati» non è stato trovato nel PDF: verifica il conteggio sul calendario.";ch.className="check warn";}
+  else if(autoN===gl){ch.textContent="Il calcolo automatico coincide con i giorni lavorati del cartellino ("+gl+")."+(risk.length!==autoN?" Hai modificato a mano "+Math.abs(risk.length-autoN)+" giorn"+(Math.abs(risk.length-autoN)===1?"o":"i")+".":"");ch.className="check";}
+  else{ch.textContent="Attenzione: il cartellino riporta "+gl+" giorni lavorati, il calcolo sulle timbrature ne trova "+autoN+". Controlla i giorni segnalati.";ch.className="check warn";}
+  // calendario
+  const cal=$("cal"); cal.innerHTML="";
+  ["lun","mar","mer","gio","ven","sab","dom"].forEach(w=>{const e=document.createElement("div");e.className="dow";e.textContent=w;cal.appendChild(e)});
+  const first=(new Date(y,m,1).getDay()+6)%7;
+  for(let i=0;i<first;i++)cal.appendChild(document.createElement("div"));
+  S.days.forEach(d=>{
+    const b=document.createElement("button");b.type="button";
+    b.className="cell"+(d.weekend&&!d.stamps.length?" we":"")+(d.risk?" risk":"")+(S.override[d.day]!==undefined?" manual":"")+(d.anomaly||d.odd?" anom":"");
+    const lbl=label(d);
+    b.innerHTML=`<span class="d">${d.day}</span>${d.stamps.length?`<span class="p">${d.odd?"dispari":fmt(d.pres)}${d.excess?`<span class="x">+${d.excess}′</span>`:""}</span>`:""}${lbl?`<span class="l">${lbl}</span>`:""}${d.anomaly&&!lbl?`<span class="l">senza giustificativo</span>`:""}${(d.anomaly||d.odd)?`<span class="a">!</span>`:""}`;
+    b.setAttribute("aria-pressed",d.risk);
+    b.setAttribute("aria-label",`${d.day} ${M}: ${d.risk?"giornata di rischio":"non conteggiato"}`);
+    if(d.weekend&&!d.stamps.length){b.disabled=true}
+    else b.onclick=()=>{const cur=d.risk;if(!cur===d.auto)delete S.override[d.day];else S.override[d.day]=!cur;render()};
+    cal.appendChild(b);
+  });
+  // segnalazioni
+  const f=[];
+  S.days.forEach(d=>{
+    if(d.anomaly) f.push(`<b>${d.day} ${M}</b>: giorno senza timbrature né giustificativo. Se eri in servizio, regolarizza sul portale e ricarica il PDF prima di inviare; se eri presente puoi intanto includerlo toccando il giorno.`);
+    if(d.odd) f.push(`<b>${d.day} ${M}</b>: numero di timbrature dispari (${d.stamps.join(" ")}). Conteggiato come presenza; correggi gli orari nella tabella per il calcolo dei minuti.`);
+    if(d.extOnly) f.push(`<b>${d.day} ${M}</b>: servizio esterno senza timbrature, escluso dal rischio. Toccalo per includerlo se l'attività comportava esposizione.`);
+  });
+  if(S.data.anomalie&&!S.days.some(d=>d.anomaly)) f.push("Il cartellino segnala: "+S.data.anomalie);
+  $("flags").innerHTML=f.map(x=>`<p>${x}</p>`).join(""); $("flags").classList.toggle("hidden",!f.length);
+  // tabella
+  const tb=$("tbody"); tb.innerHTML="";
+  S.days.filter(d=>!(d.weekend&&!d.stamps.length)).forEach(d=>{
+    const tr=document.createElement("tr");
+    const match=d.totTimb?(toMin(d.totTimb)===d.pres?`<span class="ok">${d.totTimb}</span>`:`<span class="bad">${d.totTimb}</span>`):"—";
+    tr.innerHTML=`<td>${d.day} ${d.wd}</td><td><input data-d="${d.day}" value="${d.stamps.join(" ")}" aria-label="Timbrature del ${d.day}"></td><td>${d.stamps.length?(d.odd?"dispari":fmt(d.pres)):"—"}</td><td>${match}</td><td>${d.causali.map(c=>c.desc+(c.dur?" "+c.dur:"")).join("; ")||(d.anomaly?"anomalia":"")}</td>`;
+    tb.appendChild(tr);
+  });
+  tb.querySelectorAll("input").forEach(inp=>inp.addEventListener("change",e=>{
+    const d=S.days.find(x=>x.day===+e.target.dataset.d); d.stamps=e.target.value.match(/\d{1,2}:\d{2}/g)||[]; render();}));
+  buildMsgs(); dueText($("dueRisk"),+$("dueDayRisk").value||18); dueText($("dueExc"),+$("dueDayExc").value||7);
+}
+
+function buildMsgs(){
+  const m=+$("month").value,y=+$("year").value,M=MESI_IT[m];
+  const risk=S.days.filter(d=>d.risk).map(d=>d.day);
+  const firma=$("firma").value.trim();
+  $("subjRisk").value=`Giornate di rischio ${M} ${y} - ${firma}${S.data.matricola?" (matr. "+S.data.matricola+")":""}`;
+  let b="Gentile Enrico,\n\nin riscontro alla richiesta, comunico che ";
+  if(!risk.length) b+=`nel mese di ${M} ${y} non risultano giornate di rischio.`;
+  else b+=`le giornate di rischio relative al mese di ${M} ${y} sono pari a n. ${risk.length}`+($("listDays").checked?` (${risk.length===1?"giorno":"giorni"} ${joinIt(risk.map(String))}).`:".");
+  b+=`\n\nCordiali saluti,\n${firma}`;
+  $("msgRisk").value=b;
+  // ore eccedenti (stesso template dello strumento precedente)
+  const coord=$("coord").value.trim()||"[nome]";
+  const fl=S.days.filter(d=>d.excess).sort((a,b)=>b.day-a.day);
+  let e;
+  if(!fl.length) e=`Gent.mo ${coord} buongiorno,\n\ncon riferimento al mese di ${M} ${y}, non risultano giornate con presenza superiore alle nove ore di servizio: non è pertanto necessaria alcuna richiesta di riconoscimento.\n\nCordiali saluti.`;
+  else{
+    const list=fl.length===1?"nel giorno "+fl[0].day:"nei giorni "+joinIt(fl.map(d=>String(d.day)));
+    e=`Gent.mo ${coord} buongiorno,\n\ncon la presente, ti chiedo di essere autorizzato al riconoscimento dei minuti in eccesso, rispetto alle nove ore di servizio previste, ${list} ${M} ${y}, in quanto sono rimasto in servizio per attività lavorative non derogabili.`;
+    if($("detail").checked) e+="\n\nDettaglio:\n"+fl.slice().sort((a,b)=>a.day-b.day).map(d=>`  • ${d.day} ${M}: presenza ${fmt(d.pres)}, ${d.excess} minuti oltre le 9 ore`).join("\n");
+    e+="\n\nIn attesa di un tuo gentile riscontro, ti porgo cordiali saluti.";
+  }
+  $("msgExc").value=e;
+  saveSettings(); scheduleSave();
+}
+
+function toast(t){const e=$("toast");e.textContent=t;e.classList.add("on");setTimeout(()=>e.classList.remove("on"),1600)}
+async function copy(id){const v=$(id).value;try{await navigator.clipboard.writeText(v)}catch{const t=$(id);t.select();document.execCommand("copy")}toast("Testo copiato")}
+document.querySelectorAll("[data-copy]").forEach(b=>b.onclick=()=>copy(b.dataset.copy));
+$("gmailRisk").onclick=()=>window.open("https://mail.google.com/mail/?view=cm&fs=1&to="+encodeURIComponent($("toRisk").value)+"&su="+encodeURIComponent($("subjRisk").value)+"&body="+encodeURIComponent($("msgRisk").value),"_blank");
+$("mailRisk").onclick=()=>location.href="mailto:"+encodeURIComponent($("toRisk").value)+"?subject="+encodeURIComponent($("subjRisk").value)+"&body="+encodeURIComponent($("msgRisk").value);
+$("mailExc").onclick=()=>{const m=MESI_IT[+$("month").value];location.href="mailto:?subject="+encodeURIComponent("Richiesta riconoscimento minuti eccedenti "+m+" "+$("year").value)+"&body="+encodeURIComponent($("msgExc").value)};
+["listDays","detail","coord","firma","toRisk"].forEach(id=>$(id).addEventListener("input",buildMsgs));
+["msgRisk","msgExc","subjRisk"].forEach(id=>$(id).addEventListener("input",scheduleSave));
+["month","year","minPres","soglia","dueDayRisk","dueDayExc"].forEach(id=>$(id).addEventListener("change",render));
+
+function prettyName(n){const w=n.toLowerCase().split(/\s+/).filter(Boolean).map(s=>s[0].toUpperCase()+s.slice(1));return w.length>1?w[w.length-1]+" "+w.slice(0,-1).join(" "):w.join(" ")}
+async function handle(file){
+  const st=$("status");
+  if(!file||!/pdf$/i.test(file.type||file.name)){st.textContent="Il file deve essere un PDF del cartellino.";st.className="err";return}
+  try{
+    const bytes=new Uint8Array(await file.arrayBuffer());
+    const doc=await pdfjsLib.getDocument({data:bytes.slice()}).promise;
+    let raw=[];for(let n=1;n<=doc.numPages;n++){const tc=await(await doc.getPage(n)).getTextContent();raw=raw.concat(tc.items.map(i=>({s:i.str,x:i.transform[4],y:i.transform[5]})))}
+    const data=parseCartellino(raw);
+    S={data,days:data.days,override:{},pdf:bytes};
+    if(data.month>=0)$("month").value=data.month; $("year").value=data.year||new Date().getFullYear();
+    if(data.name)$("firma").value=prettyName(data.name);
+    st.textContent=file.name+(data.calc?" (ultimo calcolo "+data.calc+")":"");st.className="";
+    $("out").classList.remove("hidden"); render();
+  }catch(err){console.error(err);st.textContent="Non riesco a leggere questo PDF: "+err.message+". Verifica che sia il cartellino orario mensile.";st.className="err"}
+}
+$("pick").onclick=()=>$("file").click();
+document.addEventListener("paste",e=>{const f=[...(e.clipboardData?.files||[])].find(x=>/pdf$/i.test(x.type||x.name));if(f){e.preventDefault();handle(f)}});
+$("file").onchange=e=>handle(e.target.files[0]);
+const dz=$("drop");
+["dragenter","dragover"].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add("over")}));
+["dragleave","drop"].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.remove("over")}));
+dz.addEventListener("drop",e=>handle(e.dataTransfer.files[0]));
+document.addEventListener("dragover",e=>e.preventDefault());document.addEventListener("drop",e=>e.preventDefault());
+
+// ===== impostazioni persistenti =====
+const SET_IDS=["coord","toRisk","dueDayRisk","dueDayExc","minPres","soglia"],CHK_IDS=["listDays","detail"];
+function saveSettings(){try{const o={};SET_IDS.forEach(i=>o[i]=$(i).value);CHK_IDS.forEach(i=>o[i]=$(i).checked);localStorage.setItem("adempimenti-set",JSON.stringify(o))}catch{}}
+try{const o=JSON.parse(localStorage.getItem("adempimenti-set")||"null");if(o){SET_IDS.forEach(i=>{if(o[i]!=null)$(i).value=o[i]});CHK_IDS.forEach(i=>{if(o[i]!=null)$(i).checked=o[i]})}}catch{}
+
+// ===== cartella locale (File System Access API) =====
+const FS="showDirectoryPicker" in window, RW={mode:"readwrite"}, SUB="Adempimenti mensili";
+let root=null, saveTimer=null;
+function kv(){return new Promise((res,rej)=>{const r=indexedDB.open("adempimenti",1);r.onupgradeneeded=()=>r.result.createObjectStore("kv");r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
+async function kvGet(k){try{const db=await kv();return await new Promise(r=>{const q=db.transaction("kv").objectStore("kv").get(k);q.onsuccess=()=>r(q.result);q.onerror=()=>r(null)})}catch{return null}}
+async function kvSet(k,v){try{const db=await kv();await new Promise(r=>{const t=db.transaction("kv","readwrite");t.objectStore("kv").put(v,k);t.oncomplete=r;t.onerror=r})}catch{}}
+function setSave(t,cls){const e=$("saveState");e.textContent=t;e.className=cls||""}
+async function folderUI(){
+  const txt=$("folderTxt"),btn=$("folderBtn");
+  if(!FS){txt.textContent="Questo browser non consente il salvataggio in cartella: usa Chrome o Edge. Puoi comunque scaricare i documenti.";btn.textContent="Scarica i documenti";return}
+  if(!root){txt.textContent="Cartella di salvataggio non ancora scelta.";btn.textContent="Scegli la cartella Lavoro";btn.classList.remove("hidden");return}
+  const p=await root.queryPermission(RW);
+  txt.innerHTML=`Salvataggio in <b>${root.name}/${SUB}</b>`+(p==="granted"?"":" (accesso da riattivare)");
+  btn.textContent=p==="granted"?"Cambia cartella":"Riattiva l'accesso";
+}
+$("folderBtn").onclick=async()=>{
+  if(!FS){downloadAll();return}
+  try{
+    if(root&&(await root.queryPermission(RW))!=="granted"){ if((await root.requestPermission(RW))==="granted"){await folderUI();saveAll();return} }
+    root=await window.showDirectoryPicker({id:"lavoro",mode:"readwrite",startIn:"documents"});
+    await kvSet("root",root); await folderUI(); saveAll();
+  }catch(err){if(err.name!=="AbortError")setSave("Impossibile usare la cartella: "+err.message,"err")}
+};
+function pad(n){return String(n).padStart(2,"0")}
+function docs(){
+  const m=+$("month").value,y=+$("year").value,M=MESI_IT[m],tag=`${y}-${pad(m+1)}`;
+  const nl=s=>"\uFEFF"+s.replace(/\r?\n/g,"\r\n");
+  return {folder:`${tag} ${M}`,files:[
+    [`Giornate_rischio_Lucaioli_${tag}.txt`,nl(`A: ${$("toRisk").value}\nOggetto: ${$("subjRisk").value}\n\n${$("msgRisk").value}\n`)],
+    [`Richiesta_minuti_eccedenti_Domenico_${tag}.txt`,nl(`Oggetto: Richiesta riconoscimento minuti eccedenti ${M} ${y}\n\n${$("msgExc").value}\n`)],
+    [`Cartellino_${tag}.pdf`,S.pdf]
+  ]};
+}
+function scheduleSave(){clearTimeout(saveTimer);saveTimer=setTimeout(saveAll,700)}
+async function saveAll(){
+  if(!S.data)return;
+  if(!FS){setSave("");return}
+  if(!root){setSave("Scegli la cartella per salvare automaticamente.","err");return}
+  if((await root.queryPermission(RW))!=="granted"){await folderUI();setSave("Clicca «Riattiva l'accesso» per salvare.","err");return}
+  try{
+    const d=docs(), base=await root.getDirectoryHandle(SUB,{create:true}), sub=await base.getDirectoryHandle(d.folder,{create:true});
+    for(const [name,data] of d.files){ if(!data)continue; const fh=await sub.getFileHandle(name,{create:true});const w=await fh.createWritable();await w.write(data);await w.close(); }
+    const t=new Date();setSave(`Salvato in ${root.name}/${SUB}/${d.folder} alle ${pad(t.getHours())}:${pad(t.getMinutes())}`,"ok");
+  }catch(err){console.error(err);setSave("Salvataggio non riuscito: "+err.message,"err")}
+}
+function downloadAll(){
+  if(!S.data){setSave("Carica prima il cartellino.","err");return}
+  docs().files.filter(f=>typeof f[1]==="string").forEach(([name,data])=>{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([data],{type:"text/plain;charset=utf-8"}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000)});
+}
+(async()=>{ if(FS){ root=await kvGet("root")||null; } folderUI(); })();
+</script>
+</body></html>
